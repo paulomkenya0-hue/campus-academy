@@ -1,0 +1,19 @@
+{
+  "name": "campus-academy-functions",
+  "version": "1.0.0",
+  "description": "Server-authoritative logic for Campus Academy: auth/whitelist, quiz scoring, XP, streaks, stage unlocking, certificates.",
+  "main": "src/index.js",
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "serve": "firebase emulators:start --only functions,firestore,auth,storage",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.1.0",
+    "firebase-functions": "^5.0.0"
+  },
+  "private": true
+}

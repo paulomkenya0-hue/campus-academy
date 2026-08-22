@@ -1,0 +1,171 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return request.auth.token.role;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (role() == 'super_admin' || role() == 'developer');
+    }
+
+    function isStudent() {
+      return isSignedIn() && role() == 'student';
+    }
+
+    function isOwner(studentId) {
+      return isStudent() && request.auth.uid == studentId;
+    }
+
+    // ---------- Admins registry (written only by the local bootstrap script / Admin SDK) ----------
+    match /admins/{adminUid} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // ---------- Gamification config (XP rules, level thresholds, streak rules) ----------
+    match /config/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ---------- Approved student whitelist (write: admin only, via Cloud Functions/console) ----------
+    match /approvedStudents/{regNumber} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ---------- Student profile / gamification state ----------
+    // XP, level, streak, badges, unlockedStages are server-authoritative:
+    // students may read their own doc but NEVER write the gamified fields directly.
+    match /students/{studentId} {
+      allow read: if isAdmin() || isOwner(studentId);
+
+      // Students may only touch their own editable profile fields (name, bio, photoURL).
+      // xp/level/streak/xpHistory/unlockedStages/scores are blocked from client writes entirely —
+      // they are written only by Cloud Functions using the Admin SDK, which bypasses these rules.
+      allow update: if isOwner(studentId) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['displayName', 'bio', 'photoURL', 'updatedAt']);
+
+      allow create: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ---------- Courses / stages / topics / lessons (content) ----------
+    match /courses/{courseId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+
+      match /stages/{stageId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
+
+        match /topics/{topicId} {
+          allow read: if isSignedIn();
+          allow write: if isAdmin();
+
+          match /questions/{questionId} {
+            // Never expose correct answers / explanations to students directly.
+            // Client-side reads to this sub-collection are blocked entirely;
+            // quizzes are served and scored through callable Cloud Functions.
+            allow read: if isAdmin();
+            allow write: if isAdmin();
+          }
+        }
+      }
+    }
+
+    // ---------- Progress (server-authoritative) ----------
+    match /progress/{progressId} {
+      allow read: if isAdmin() || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow write: if isAdmin(); // Cloud Functions only (Admin SDK bypasses this anyway)
+    }
+
+    // ---------- Quiz attempts ----------
+    match /quizAttempts/{attemptId} {
+      allow read: if isAdmin() || (isStudent() && resource.data.studentId == request.auth.uid);
+      // Students never write attempts directly — they call the submitQuizAttempt function.
+      allow write: if isAdmin();
+    }
+
+    // ---------- XP transactions (audit trail) ----------
+    match /xpTransactions/{txId} {
+      allow read: if isAdmin() || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    // ---------- Badges ----------
+    match /badges/{badgeId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /studentBadges/{docId} {
+      allow read: if isAdmin() || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    // ---------- Leaderboard (denormalized, read-only for students) ----------
+    match /leaderboards/{period} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ---------- Chat ----------
+    match /chatRooms/{roomId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn();
+        allow create: if isStudent() &&
+          request.resource.data.senderId == request.auth.uid &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() > 0 &&
+          request.resource.data.text.size() < 2000;
+        // Students can only delete their own message; moderation deletes go through admin.
+        allow delete: if isAdmin() || (isStudent() && resource.data.senderId == request.auth.uid);
+        allow update: if isAdmin();
+      }
+    }
+
+    // ---------- Notifications ----------
+    match /notifications/{notifId} {
+      allow read: if isAdmin() || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow update: if isStudent() && resource.data.studentId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
+      allow write: if isAdmin();
+    }
+
+    // ---------- Certificates (never editable by students) ----------
+    // Public read is intentional: /certificate/{certId} must be verifiable by anyone
+    // with the link, without logging in. Only put non-sensitive fields on this doc
+    // (name, course, completion date, cert ID, status) — never email/phone/regNumber.
+    match /certificates/{certId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---------- Competitions ----------
+    match /competitions/{compId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /competitionResults/{resultId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ---------- Audit logs ----------
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false; // Cloud Functions (Admin SDK) only — never client-writable
+    }
+  }
+}
