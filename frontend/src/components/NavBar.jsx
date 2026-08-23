@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
+import { NotificationBell } from "./NotificationBell.jsx";
 
 export function NavBar() {
   const { profile, logout } = useAuth();
@@ -17,7 +18,10 @@ export function NavBar() {
         <div className="flex items-center gap-4 text-sm">
           <Link to="/" className="hover:text-teal">Dashibodi</Link>
           <Link to="/leaderboard" className="hover:text-teal">Ubao wa Ushindi</Link>
+          <Link to="/chat" className="hover:text-teal">Mazungumzo</Link>
+          <Link to="/certificates" className="hover:text-teal">Vyeti</Link>
           <Link to="/profile" className="hover:text-teal">Wasifu</Link>
+          <NotificationBell />
           {profile && (
             <div className="flex items-center gap-2">
               {profile.photoURL ? (

@@ -4,6 +4,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../firebase";
 import { NavBar } from "../components/NavBar.jsx";
+import { useAssessmentGuard, formatTime } from "../hooks/useAssessmentGuard.js";
 
 export default function TopicView() {
   const { courseId, stageId, topicId } = useParams();
@@ -58,6 +59,13 @@ export default function TopicView() {
     }
   }
 
+  const { secondsLeft, violationCount, warning } = useAssessmentGuard({
+    active: mode === "quiz" && topic?.assessmentMode,
+    courseId, stageId, topicId,
+    timeLimitSeconds: topic?.timeLimitSeconds,
+    onAutoSubmit: submitQuiz,
+  });
+
   if (!topic) {
     return (
       <div className="min-h-screen">
@@ -85,6 +93,20 @@ export default function TopicView() {
 
         {mode === "quiz" && quiz && (
           <div className="space-y-5">
+            {topic.assessmentMode && (
+              <div className="card border-amber flex items-center justify-between">
+                <div>
+                  <p className="text-amber font-bold text-sm">⏱️ Hali ya Mtihani (Assessment Mode)</p>
+                  <p className="text-xs text-ivory-muted mt-1">
+                    Usiondoke ukurasa huu. Matukio ya kutoka yanahifadhiwa.
+                  </p>
+                </div>
+                {topic.timeLimitSeconds && (
+                  <span className="font-mono text-lg text-amber">{formatTime(secondsLeft)}</span>
+                )}
+              </div>
+            )}
+            {warning && <p className="text-danger text-sm bg-night-raised p-2 rounded-lg">{warning}</p>}
             {quiz.map((q, i) => (
               <div key={q.id} className="card">
                 <p className="font-display font-bold mb-3">{i + 1}. {q.text}</p>
@@ -134,6 +156,9 @@ export default function TopicView() {
               )}
               {result.stageCompleted && (
                 <p className="mt-2 text-teal text-sm">🎉 Umekamilisha stage nzima!</p>
+              )}
+              {result.newBadges?.length > 0 && (
+                <p className="mt-2 text-amber text-sm">🏅 Beji mpya: {result.newBadges.length}! Angalia wasifu wako.</p>
               )}
             </div>
 

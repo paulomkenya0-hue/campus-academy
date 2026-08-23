@@ -140,4 +140,39 @@ const setPublishStatus = onCall(async (request) => {
   return { ok: true };
 });
 
-module.exports = { createCourse, createStage, createTopic, createQuestion, setPublishStatus };
+/** Marks (or unmarks) a topic's quiz as the course's Final Assessment,
+ * used by the competition qualification scoring (spec section 24). */
+const setTopicFinalAssessment = onCall(async (request) => {
+  assertAdmin(request);
+  const { courseId, stageId, topicId, isFinalAssessment } = request.data || {};
+  if (!courseId || !stageId || !topicId || typeof isFinalAssessment !== "boolean") {
+    throw new HttpsError("invalid-argument", "courseId, stageId, topicId na isFinalAssessment vinahitajika.");
+  }
+  await db.collection("courses").doc(courseId).collection("stages").doc(stageId)
+    .collection("topics").doc(topicId)
+    .update({ isFinalAssessment, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+
+  await logAudit({ actorId: request.auth.uid, actorRole: "admin", action: "topic.final_assessment_flag_set", targetType: "topic", targetId: topicId, details: { isFinalAssessment } });
+  return { ok: true };
+});
+
+/** Toggles assessment-mode restrictions (timer, tab-switch detection, no back-nav warning) for a topic's quiz. */
+const setTopicAssessmentMode = onCall(async (request) => {
+  assertAdmin(request);
+  const { courseId, stageId, topicId, assessmentMode, timeLimitSeconds } = request.data || {};
+  if (!courseId || !stageId || !topicId || typeof assessmentMode !== "boolean") {
+    throw new HttpsError("invalid-argument", "courseId, stageId, topicId na assessmentMode vinahitajika.");
+  }
+  await db.collection("courses").doc(courseId).collection("stages").doc(stageId)
+    .collection("topics").doc(topicId)
+    .update({
+      assessmentMode,
+      timeLimitSeconds: typeof timeLimitSeconds === "number" ? timeLimitSeconds : null,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+  await logAudit({ actorId: request.auth.uid, actorRole: "admin", action: "topic.assessment_mode_set", targetType: "topic", targetId: topicId, details: { assessmentMode, timeLimitSeconds } });
+  return { ok: true };
+});
+
+module.exports = { createCourse, createStage, createTopic, createQuestion, setPublishStatus, setTopicFinalAssessment, setTopicAssessmentMode };

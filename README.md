@@ -8,8 +8,10 @@ Auth, student whitelist, dashibodi ya mwanafunzi, dashibodi ya admin, Course →
 usomaji wa somo mtandaoni, quiz yenye alama za kiotomatiki (server-side), stage unlocking,
 XP na streak ya msingi, picha ya profaili, na cheti cha msingi + ukurasa wa uthibitishaji.
 
-Haijajumuisha bado (Phase 2/3): badges, student chat, notifications, practical labs,
-mashindano (competitions), advanced anti-cheating.
+Haijajumuisha bado (Phase 3): practical labs (CTF-style), competition system, advanced anti-cheating.
+
+Phase 2 (imeongezwa): badges (auto-awarded server-side), student chat (na moderation), notifications +
+matangazo ya admin, na uchambuzi wa hali ya juu (course analytics) kwa admin.
 
 ---
 
@@ -196,8 +198,79 @@ streak calculation, admin permission boundaries, file upload validation.
   inayowekwa kwenye logs.
 - Certificate verification (`/certificate/:certId`): inaonyesha taarifa zisizo za siri pekee.
 
-## 11. Hatua Zinazofuata (Phase 2 / 3)
+## 11. Hatua Zinazofuata (Phase 3)
 
-Angalia spec ya awali (sehemu 37) — Phase 2: badges, leaderboard UI zaidi, student chat,
-notifications. Phase 3: practical labs (CTF-style), competition system, advanced anti-cheating,
-QR verification kwenye vyeti.
+Angalia spec ya awali (sehemu 37) — practical labs (CTF-style), competition system,
+advanced anti-cheating, QR verification kwenye vyeti.
+
+## 12. Phase 2 — Vipengele Vipya
+
+### Badges (Beji)
+- Admin anaunda beji kupitia `/admin/badges` (au anatumia "Unda Beji za Mfano" kwa mifano 4 ya haraka:
+  7 Day Warrior, Perfect Score, Security Rookie, Fast Learner).
+- Kila beji ina `criteria` moja kati ya: `streak_days`, `perfect_score`, `first_stage_complete`,
+  `fast_quiz`, `course_complete`.
+- Baada ya kila `submitQuizAttempt`, Cloud Function `checkAndAwardBadges` inapima vigezo hivi
+  dhidi ya hali ya sasa ya mwanafunzi na kutoa beji mpya kiotomatiki + arifa (notification).
+  Hii haiwezi kudanganywa na frontend — inatokea server-side pekee.
+
+### Mazungumzo (Chat)
+- `/chat` — vyumba viwili vya awali: "Majadiliano ya Jumla" na "Maswali na Majibu".
+- Ujumbe unahifadhiwa Firestore (`chatRooms/{roomId}/messages`), unaonekana kwa wakati halisi
+  (`onSnapshot`). Mwanafunzi anaweza kufuta ujumbe wake mwenyewe pekee; Admin anaweza kufuta ujumbe wowote.
+
+### Taarifa (Notifications) na Matangazo
+- Taarifa binafsi (`notifications` collection) zinaundwa kiotomatiki wakati: beji imepatikana,
+  stage imefunguliwa, au (kila siku saa ~18:00 EAT) mwanafunzi mwenye mfululizo hai bado
+  hajafanya shughuli leo — `streakReminderScheduled`.
+- Matangazo ya jumla (`/admin/announcements`) yanaandikwa hati MOJA inayosomwa na wanafunzi wote
+  (badala ya kuandika hati kwa kila mwanafunzi — nafuu zaidi kwa idadi kubwa).
+- Kengele ya arifa (🔔) kwenye NavBar inaonyesha zote mbili — taarifa binafsi na matangazo ya hivi karibuni.
+
+### Uchambuzi wa Hali ya Juu (Course Analytics)
+- `/admin/analytics` — chagua kozi, ona: jumla ya majaribio ya quiz, wastani wa alama,
+  idadi ya waliomaliza kozi, na utendaji kwa kila mada (attempts, pass rate, wastani).
+- Inahesabiwa kwa `getCourseAnalytics` (Cloud Function) kwa ombi (on-demand) — inafaa kwa
+  ukubwa wa MVP; kwa idadi kubwa zaidi ya wanafunzi, hii inaweza kuhamishiwa kwenye
+  scheduled pre-aggregation job.
+
+## 13. Phase 3 — Vipengele Vipya
+
+### Mazoezi ya Vitendo (Practical Labs / CTF)
+- Admin anaunda lab kupitia `/admin/labs`: jina, maelekezo, na **flag sahihi**. Flag haihifadhiwi
+  kamwe kama maandishi wazi — inahesabiwa kama `SHA-256(salt:flag)` na salt ya nasibu, kisha
+  hash + salt tu ndivyo vinavyohifadhiwa Firestore.
+- Mwanafunzi anawasilisha jibu lake kupitia `submitLabFlag` — Cloud Function inahesabu hash ya
+  jibu lililowasilishwa na kulinganisha na hash iliyohifadhiwa. XP inatolewa mara moja tu kwa kila lab.
+- Onyo la spec section 26: labs zote ni za mazingira ya mafunzo yaliyodhibitiwa — jukwaa
+  halijaundwa kuhimiza mashambulizi dhidi ya mifumo halisi ya watu wengine.
+
+### Mashindano (Competition System)
+- `createCompetition` (admin, imefungwa kwa kozi moja) → `runQualification` inahesabu alama
+  iliyopimwa kwa kila mwanafunzi hai: `quizzes% × 0.3 + labs% × 0.4 + finalAssessment% × 0.3`
+  (uzito unaoweza kubadilishwa), inapanga, na kuchagua Top N (chaguo-msingi 5) kama washiriki
+  wa mwisho.
+- Raundi za mashindano ya mwisho (Knowledge / Practical / Final) — alama zinaingizwa na Admin
+  kwa mkono kupitia `submitRoundScore` (spec inasisitiza mashindano ya mwisho yanahitaji usimamizi
+  wa moja kwa moja, si otomatiki kabisa).
+- `publishFinalResults` inajumlisha alama za raundi zote, inapanga, na kutoa medali 🥇🥈🥉 — tu
+  baada ya Admin kukagua na kuthibitisha.
+
+### Anti-Cheating ya Hali ya Juu
+- Admin anaweza kuwasha "Assessment Mode" kwa mada yoyote (`setTopicAssessmentMode`) na kuweka
+  kikomo cha muda.
+- Wakati wa mtihani: kipima muda kinaonekana, tab-switch/window-blur inagundulika na
+  `logSuspiciousEvent` (idadi ya matukio inahesabiwa **server-side**, hivyo mwanafunzi hawezi
+  kuizungusha kwa ku-refresh ukurasa), na baada ya matukio 3 au muda kuisha, jibu linawasilishwa
+  kiotomatiki.
+- Kama spec inavyosisitiza: hii inafanya udanganyifu kuwa mgumu zaidi na kurekodi tabia za
+  kutiliwa shaka — HAIWEZI kuzuia udanganyifu kikamilifu kwenye kivinjari. Kwa mashindano
+  muhimu ya mwisho, tumia usimamizi wa ana kwa ana (proctored) kama spec inavyopendekeza.
+
+### Vyeti + QR Verification
+- `/admin/certificates` inaonyesha wanafunzi waliokamilisha stage ya mwisho ya kozi na kitufe
+  cha "Toa Cheti" (`issueCertificate`).
+- Mwanafunzi anaona vyeti vyake kwenye `/certificates`.
+- Ukurasa wa uthibitishaji wa umma (`/certificate/:certId`, hauhitaji login) sasa unaonyesha
+  picha ya QR inayoelekeza kwenye kiungo hicho hicho cha uthibitishaji — rahisi kuchanganua
+  kutoka kwenye cheti kilichochapishwa.

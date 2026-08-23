@@ -32,6 +32,16 @@ const DEFAULTS = {
   streak: {
     timezone: "Africa/Dar_es_Salaam",
   },
+  assessment: {
+    // Applies to assessment-mode quizzes/final assessments (spec section 15-16).
+    // Individual topics/final assessments can override timeLimitSeconds.
+    defaultTimeLimitSeconds: 600,
+    maxTabSwitchViolations: 3,
+  },
+  competition: {
+    scoringWeights: { quizzes: 0.3, labs: 0.4, finalAssessment: 0.3 },
+    topN: 5,
+  },
 };
 
 let cache = null;
@@ -50,6 +60,12 @@ async function getGamificationConfig() {
     levels: stored.levels && stored.levels.length ? stored.levels : DEFAULTS.levels,
     quiz: { ...DEFAULTS.quiz, ...(stored.quiz || {}) },
     streak: { ...DEFAULTS.streak, ...(stored.streak || {}) },
+    assessment: { ...DEFAULTS.assessment, ...(stored.assessment || {}) },
+    competition: {
+      ...DEFAULTS.competition,
+      ...(stored.competition || {}),
+      scoringWeights: { ...DEFAULTS.competition.scoringWeights, ...(stored.competition?.scoringWeights || {}) },
+    },
   };
   cacheAt = now;
   return cache;

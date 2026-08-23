@@ -2,6 +2,8 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { db, admin } = require("./admin");
 const { getGamificationConfig, levelForXp } = require("./config");
 const { logAudit } = require("./auditLog");
+const { createNotification } = require("./notifications");
+const { checkAndAwardBadges } = require("./badges");
 
 function assertStudent(request) {
   const role = request.auth && request.auth.token && request.auth.token.role;
@@ -84,6 +86,9 @@ const submitQuizAttempt = onCall(async (request) => {
     .collection("stages").doc(stageId)
     .collection("topics").doc(topicId);
 
+  const topicSnap = await topicPath.get();
+  const isFinalAssessment = topicSnap.exists ? !!topicSnap.data().isFinalAssessment : false;
+
   // --- attempt limit check ---
   const priorAttempts = await db
     .collection("quizAttempts")
@@ -155,6 +160,7 @@ const submitQuizAttempt = onCall(async (request) => {
     passed,
     xpAwarded,
     timeTakenSeconds: timeTakenSeconds || null,
+    isFinalAssessment,
     createdAt: now,
   });
 
@@ -229,7 +235,23 @@ const submitQuizAttempt = onCall(async (request) => {
     });
     stageCompleted = result.stageCompleted;
     nextStageUnlocked = result.nextStageUnlocked;
+
+    if (stageCompleted) {
+      await createNotification({
+        studentId: uid,
+        type: "stage_unlocked",
+        title: "🎉 Umekamilisha Stage!",
+        body: nextStageUnlocked ? "Stage inayofuata sasa imefunguliwa." : "Umekamilisha stage ya mwisho ya kozi hii!",
+        data: { courseId, stageId, nextStageUnlocked },
+      });
+    }
   }
+
+  // Badge evaluation happens after XP/streak/stage state is fully settled,
+  // so criteria like streak_days or course_complete see up-to-date data.
+  const newBadges = await checkAndAwardBadges({
+    uid, courseId, stageId, percent, timeTakenSeconds, stageCompleted,
+  });
 
   await logAudit({
     actorId: uid,
@@ -251,6 +273,7 @@ const submitQuizAttempt = onCall(async (request) => {
     newLevel,
     stageCompleted,
     nextStageUnlocked,
+    newBadges,
   };
 });
 

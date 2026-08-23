@@ -149,6 +149,10 @@ export default function CourseBuilder() {
                     </div>
                     {selectedTopic?.id === t.id && (
                       <div className="mt-3 pt-3 border-t border-night-border space-y-2">
+                        <AssessmentToggles
+                          courseId={selectedCourse.id} stageId={selectedStage.id} topic={t} call={call}
+                          onUpdated={() => loadTopics(selectedCourse.id, selectedStage.id)}
+                        />
                         <NewQuestionForm
                           courseId={selectedCourse.id} stageId={selectedStage.id} topicId={t.id}
                           onCreated={() => loadQuestions(selectedCourse.id, selectedStage.id, t.id)} call={call}
@@ -228,6 +232,37 @@ function NewTopicForm({ courseId, stageId, onCreated, call, nextOrder }) {
       <input className="input-field text-sm" placeholder="Jina la mada" value={title} onChange={(e) => setTitle(e.target.value)} />
       <textarea className="input-field text-sm min-h-[100px]" placeholder="Maudhui ya somo (Kiswahili)" value={content} onChange={(e) => setContent(e.target.value)} />
       <button onClick={submit} className="btn-primary text-sm w-full">Hifadhi</button>
+    </div>
+  );
+}
+
+function AssessmentToggles({ courseId, stageId, topic, call, onUpdated }) {
+  const [timeLimit, setTimeLimit] = useState(topic.timeLimitSeconds || 600);
+  async function toggleFinal() {
+    await call("setTopicFinalAssessment", { courseId, stageId, topicId: topic.id, isFinalAssessment: !topic.isFinalAssessment });
+    onUpdated();
+  }
+  async function toggleAssessmentMode() {
+    await call("setTopicAssessmentMode", { courseId, stageId, topicId: topic.id, assessmentMode: !topic.assessmentMode, timeLimitSeconds: Number(timeLimit) });
+    onUpdated();
+  }
+  return (
+    <div className="bg-night-raised rounded p-2 text-xs space-y-2">
+      <div className="flex items-center justify-between">
+        <span>🏁 Mtihani wa Mwisho wa Kozi</span>
+        <button onClick={toggleFinal} className={topic.isFinalAssessment ? "text-teal" : "text-ivory-muted"}>
+          {topic.isFinalAssessment ? "✓ Umewekwa" : "Weka"}
+        </button>
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <span>⏱️ Hali ya Mtihani (Assessment Mode)</span>
+        <div className="flex items-center gap-2">
+          <input type="number" className="input-field text-xs py-1 w-16" value={timeLimit} onChange={(e) => setTimeLimit(e.target.value)} />
+          <button onClick={toggleAssessmentMode} className={topic.assessmentMode ? "text-teal" : "text-ivory-muted"}>
+            {topic.assessmentMode ? "✓ Imewashwa" : "Washa"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

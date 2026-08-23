@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { collection, doc, getDoc, getDocs, query, where, orderBy } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -63,6 +63,17 @@ export default function CourseView() {
             completedStageIds={completedStageIds}
             onSelect={(stage) => navigate(`/course/${courseId}/stage/${stage.id}`)}
           />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <Link to={`/course/${courseId}/labs`} className="card hover:border-teal transition-colors text-center">
+            <p className="text-2xl mb-1">🚩</p>
+            <p className="font-display font-bold text-sm">Mazoezi ya Vitendo</p>
+          </Link>
+          <Link to={`/course/${courseId}/competition`} className="card hover:border-amber transition-colors text-center">
+            <p className="text-2xl mb-1">🏅</p>
+            <p className="font-display font-bold text-sm">Mashindano</p>
+          </Link>
         </div>
       </div>
     </div>

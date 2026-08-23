@@ -36,6 +36,13 @@ export default function CertificateVerify() {
             <p className={`font-bold mb-4 ${cert.status === "valid" ? "text-teal" : "text-danger"}`}>
               {cert.status === "valid" ? "Cheti Kimethibitishwa" : "Cheti Kimefutwa"}
             </p>
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(window.location.href)}`}
+              alt="QR ya uthibitishaji"
+              className="mx-auto mb-4 rounded-lg bg-white p-2"
+              width={160}
+              height={160}
+            />
             <div className="text-left space-y-2 text-sm border-t border-night-border pt-4">
               <p><span className="text-ivory-muted">Jina:</span> {cert.studentName}</p>
               <p><span className="text-ivory-muted">Kozi:</span> {cert.courseName}</p>

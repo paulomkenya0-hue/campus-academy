@@ -124,7 +124,7 @@ service cloud.firestore {
 
       match /messages/{messageId} {
         allow read: if isSignedIn();
-        allow create: if isStudent() &&
+        allow create: if (isStudent() || isAdmin()) &&
           request.resource.data.senderId == request.auth.uid &&
           request.resource.data.text is string &&
           request.resource.data.text.size() > 0 &&
@@ -143,6 +143,45 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ---------- Announcements (platform-wide broadcast, read-only for students) ----------
+    match /announcements/{announcementId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ---------- Labs (CTF-style practical challenges) ----------
+    // The flag/salt fields live on this doc but a solved flag can never be
+    // verified client-side anyway (submitLabFlag hashes+compares server-side),
+    // so read access here only ever exposes instructions, not the answer path.
+    match /labs/{labId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /labAttempts/{attemptId} {
+      allow read: if isAdmin() || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow write: if isAdmin(); // Cloud Functions (Admin SDK) only
+    }
+
+    // ---------- Competitions ----------
+    match /competitions/{compId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /competitionParticipants/{docId} {
+      allow read: if isAdmin() || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow write: if isAdmin();
+    }
+    match /competitionResults/{resultId} {
+      allow read: if isSignedIn(); // final results are shown publicly to all students
+      allow write: if isAdmin();
+    }
+
+    // ---------- Suspicious assessment events (anti-cheating) ----------
+    match /suspiciousEvents/{eventId} {
+      allow read: if isAdmin();
+      allow write: if false; // Cloud Functions (Admin SDK) only, via logSuspiciousEvent
+    }
+
     // ---------- Certificates (never editable by students) ----------
     // Public read is intentional: /certificate/{certId} must be verifiable by anyone
     // with the link, without logging in. Only put non-sensitive fields on this doc
@@ -153,14 +192,7 @@ service cloud.firestore {
     }
 
     // ---------- Competitions ----------
-    match /competitions/{compId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-    match /competitionResults/{resultId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
+    // (full rule set — including competitionParticipants — defined above, near labs)
 
     // ---------- Audit logs ----------
     match /auditLogs/{logId} {

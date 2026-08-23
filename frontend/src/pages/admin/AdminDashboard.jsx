@@ -52,6 +52,30 @@ export default function AdminDashboard() {
             <p className="font-display font-bold mb-1">Kozi</p>
             <p className="text-sm text-ivory-muted">Unda kozi, hatua (stages), mada, na maswali</p>
           </Link>
+          <Link to="/admin/badges" className="card hover:border-teal transition-colors">
+            <p className="font-display font-bold mb-1">Beji</p>
+            <p className="text-sm text-ivory-muted">Unda na simamia beji za mafanikio</p>
+          </Link>
+          <Link to="/admin/announcements" className="card hover:border-teal transition-colors">
+            <p className="font-display font-bold mb-1">Matangazo</p>
+            <p className="text-sm text-ivory-muted">Tuma tangazo kwa wanafunzi wote</p>
+          </Link>
+          <Link to="/admin/analytics" className="card hover:border-teal transition-colors">
+            <p className="font-display font-bold mb-1">Uchambuzi</p>
+            <p className="text-sm text-ivory-muted">Utendaji wa kozi na maswali kwa undani</p>
+          </Link>
+          <Link to="/admin/labs" className="card hover:border-teal transition-colors">
+            <p className="font-display font-bold mb-1">Mazoezi ya Vitendo</p>
+            <p className="text-sm text-ivory-muted">Unda labs za CTF na flag zilizofichwa</p>
+          </Link>
+          <Link to="/admin/competitions" className="card hover:border-teal transition-colors">
+            <p className="font-display font-bold mb-1">Mashindano</p>
+            <p className="text-sm text-ivory-muted">Endesha kufuzu, ingiza alama za raundi, chapisha matokeo</p>
+          </Link>
+          <Link to="/admin/certificates" className="card hover:border-teal transition-colors">
+            <p className="font-display font-bold mb-1">Vyeti</p>
+            <p className="text-sm text-ivory-muted">Toa vyeti kwa wanafunzi waliokamilisha kozi</p>
+          </Link>
           <Link to="/admin/audit-logs" className="card hover:border-teal transition-colors">
             <p className="font-display font-bold mb-1">Kumbukumbu za Mfumo</p>
             <p className="text-sm text-ivory-muted">Angalia matukio muhimu ya usalama na usimamizi</p>

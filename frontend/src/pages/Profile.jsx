@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { useEffect, useState } from "react";
+import { doc, updateDoc, serverTimestamp, collection, query, where, getDocs, documentId } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "../firebase";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -16,6 +16,19 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [earnedBadges, setEarnedBadges] = useState([]);
+
+  useEffect(() => {
+    async function loadBadges() {
+      if (!profile) return;
+      const earnedSnap = await getDocs(query(collection(db, "studentBadges"), where("studentId", "==", profile.id)));
+      const keys = earnedSnap.docs.map((d) => d.data().badgeKey);
+      if (keys.length === 0) return setEarnedBadges([]);
+      const badgesSnap = await getDocs(query(collection(db, "badges"), where(documentId(), "in", keys.slice(0, 30))));
+      setEarnedBadges(badgesSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    }
+    loadBadges();
+  }, [profile]);
 
   async function handlePhotoChange(e) {
     const file = e.target.files?.[0];
@@ -87,6 +100,22 @@ export default function Profile() {
         <div className="grid grid-cols-2 gap-4">
           <XpBadge level={profile.level} xp={profile.xp} />
           <StreakBadge current={profile.streak?.current || 0} longest={profile.streak?.longest || 0} />
+        </div>
+
+        <div className="card">
+          <p className="label mb-3">Beji Zangu ({earnedBadges.length})</p>
+          {earnedBadges.length > 0 ? (
+            <div className="flex flex-wrap gap-3">
+              {earnedBadges.map((b) => (
+                <div key={b.id} title={b.description} className="flex flex-col items-center w-16">
+                  <span className="text-3xl">{b.icon}</span>
+                  <span className="text-xs text-center text-ivory-muted mt-1">{b.name}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-ivory-muted text-sm">Bado hujapata beji. Endelea kujifunza!</p>
+          )}
         </div>
 
         <div className="card">
