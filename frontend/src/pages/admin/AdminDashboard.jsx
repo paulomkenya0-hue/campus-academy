@@ -44,10 +44,6 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Link to="/admin/students" className="card hover:border-teal transition-colors">
-            <p className="font-display font-bold mb-1">Wanafunzi</p>
-            <p className="text-sm text-ivory-muted">Ongeza / ingiza wanafunzi, weka upya password, zima akaunti</p>
-          </Link>
           <Link to="/admin/courses" className="card hover:border-teal transition-colors">
             <p className="font-display font-bold mb-1">Kozi</p>
             <p className="text-sm text-ivory-muted">Unda kozi, hatua (stages), mada, na maswali</p>
