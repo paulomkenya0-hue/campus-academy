@@ -3,201 +3,139 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isSignedIn() {
-      return request.auth != null;
-    }
+    function isSignedIn() { return request.auth != null; }
+    function role() { return request.auth.token.role; }
+    function isAdmin() { return isSignedIn() && (role() == 'super_admin' || role() == 'developer'); }
+    function isStudent() { return isSignedIn() && role() == 'student'; }
+    function isOwner(uid) { return isStudent() && request.auth.uid == uid; }
 
-    function role() {
-      return request.auth.token.role;
-    }
+    // Kikomo cha XP kwa kila "ongezeko" moja la maandishi — client haiwezi kuweka XP kubwa kiholela
+    function xpDelta() { return request.resource.data.xp - (resource.data.xp is number ? resource.data.xp : 0); }
 
-    function isAdmin() {
-      return isSignedIn() && (role() == 'super_admin' || role() == 'developer');
-    }
-
-    function isStudent() {
-      return isSignedIn() && role() == 'student';
-    }
-
-    function isOwner(studentId) {
-      return isStudent() && request.auth.uid == studentId;
-    }
-
-    // ---------- Admins registry (written only by the local bootstrap script / Admin SDK) ----------
-    match /admins/{adminUid} {
+    match /admins/{uid} {
       allow read: if isAdmin();
-      allow write: if false;
+      allow write: if false; // script ya local pekee
     }
 
-    // ---------- Gamification config (XP rules, level thresholds, streak rules) ----------
     match /config/{docId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
-    // ---------- Approved student whitelist (write: admin only, via Cloud Functions/console) ----------
     match /approvedStudents/{regNumber} {
-      allow read: if isAdmin();
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
 
-    // ---------- Student profile / gamification state ----------
-    // XP, level, streak, badges, unlockedStages are server-authoritative:
-    // students may read their own doc but NEVER write the gamified fields directly.
     match /students/{studentId} {
       allow read: if isAdmin() || isOwner(studentId);
-
-      // Students may only touch their own editable profile fields (name, bio, photoURL).
-      // xp/level/streak/xpHistory/unlockedStages/scores are blocked from client writes entirely —
-      // they are written only by Cloud Functions using the Admin SDK, which bypasses these rules.
-      allow update: if isOwner(studentId) &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['displayName', 'bio', 'photoURL', 'updatedAt']);
-
-      allow create: if isAdmin();
+      allow create: if false; // script ya local pekee (setSuperAdmin/importStudents)
+      allow update: if isAdmin() ||
+        (isOwner(studentId) &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['displayName','bio','photoBase64','xp','level','streak',
+                      'unlockedStages','mustChangePassword','updatedAt']) &&
+          xpDelta() >= 0 && xpDelta() <= 300); // ukomo wa XP kwa jaribio moja
       allow delete: if isAdmin();
     }
 
-    // ---------- Courses / stages / topics / lessons (content) ----------
     match /courses/{courseId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
-
       match /stages/{stageId} {
         allow read: if isSignedIn();
         allow write: if isAdmin();
-
         match /topics/{topicId} {
           allow read: if isSignedIn();
           allow write: if isAdmin();
-
-          match /questions/{questionId} {
-            // Never expose correct answers / explanations to students directly.
-            // Client-side reads to this sub-collection are blocked entirely;
-            // quizzes are served and scored through callable Cloud Functions.
-            allow read: if isAdmin();
+          match /questions/{qId} {
+            // Bila server, alama sahihi lazima zionekane kwa mwanafunzi (practice mode)
+            allow read: if isSignedIn();
             allow write: if isAdmin();
           }
         }
       }
     }
 
-    // ---------- Progress (server-authoritative) ----------
     match /progress/{progressId} {
       allow read: if isAdmin() || (isStudent() && resource.data.studentId == request.auth.uid);
-      allow write: if isAdmin(); // Cloud Functions only (Admin SDK bypasses this anyway)
+      allow write: if isAdmin() || (isStudent() &&
+        request.resource.data.studentId == request.auth.uid);
     }
 
-    // ---------- Quiz attempts ----------
-    match /quizAttempts/{attemptId} {
+    match /quizAttempts/{id} {
       allow read: if isAdmin() || (isStudent() && resource.data.studentId == request.auth.uid);
-      // Students never write attempts directly — they call the submitQuizAttempt function.
-      allow write: if isAdmin();
+      allow create: if isAdmin() || (isStudent() &&
+        request.resource.data.studentId == request.auth.uid &&
+        request.resource.data.percent is number &&
+        request.resource.data.percent >= 0 && request.resource.data.percent <= 100);
     }
 
-    // ---------- XP transactions (audit trail) ----------
-    match /xpTransactions/{txId} {
+    match /xpTransactions/{id} {
       allow read: if isAdmin() || (isStudent() && resource.data.studentId == request.auth.uid);
-      allow write: if isAdmin();
+      allow create: if isAdmin() || (isStudent() &&
+        request.resource.data.studentId == request.auth.uid &&
+        request.resource.data.amount <= 300);
     }
 
-    // ---------- Badges ----------
-    match /badges/{badgeId} {
+    match /badges/{key} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
-    match /studentBadges/{docId} {
+    match /studentBadges/{id} {
+      allow read: if isAdmin() || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow create: if isAdmin() || (isStudent() && request.resource.data.studentId == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    match /labs/{labId} {
+      allow read: if isSignedIn(); // flagHash+salt zipo hapa; hazivujishi flag halisi
+      allow write: if isAdmin();
+    }
+    match /labAttempts/{id} {
+      allow read: if isAdmin() || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow write: if isAdmin() || (isStudent() && request.resource.data.studentId == request.auth.uid);
+    }
+
+    match /competitions/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /competitionParticipants/{id} {
       allow read: if isAdmin() || (isStudent() && resource.data.studentId == request.auth.uid);
       allow write: if isAdmin();
     }
+    match /competitionResults/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
 
-    // ---------- Leaderboard (denormalized, read-only for students) ----------
-    match /leaderboards/{period} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    // ---------- Chat ----------
     match /chatRooms/{roomId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
-
-      match /messages/{messageId} {
+      match /messages/{msgId} {
         allow read: if isSignedIn();
-        allow create: if (isStudent() || isAdmin()) &&
-          request.resource.data.senderId == request.auth.uid &&
-          request.resource.data.text is string &&
-          request.resource.data.text.size() > 0 &&
-          request.resource.data.text.size() < 2000;
-        // Students can only delete their own message; moderation deletes go through admin.
+        allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid &&
+          request.resource.data.text.size() > 0 && request.resource.data.text.size() < 2000;
         allow delete: if isAdmin() || (isStudent() && resource.data.senderId == request.auth.uid);
-        allow update: if isAdmin();
       }
     }
 
-    // ---------- Notifications ----------
-    match /notifications/{notifId} {
+    match /notifications/{id} {
       allow read: if isAdmin() || (isStudent() && resource.data.studentId == request.auth.uid);
+      allow create: if isSignedIn(); // aliyesababisha tukio anaandika notification yake
       allow update: if isStudent() && resource.data.studentId == request.auth.uid &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
-      allow write: if isAdmin();
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read','readAt']);
     }
+    match /announcements/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
 
-    // ---------- Announcements (platform-wide broadcast, read-only for students) ----------
-    match /announcements/{announcementId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    // ---------- Labs (CTF-style practical challenges) ----------
-    // The flag/salt fields live on this doc but a solved flag can never be
-    // verified client-side anyway (submitLabFlag hashes+compares server-side),
-    // so read access here only ever exposes instructions, not the answer path.
-    match /labs/{labId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-    match /labAttempts/{attemptId} {
-      allow read: if isAdmin() || (isStudent() && resource.data.studentId == request.auth.uid);
-      allow write: if isAdmin(); // Cloud Functions (Admin SDK) only
-    }
-
-    // ---------- Competitions ----------
-    match /competitions/{compId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-    match /competitionParticipants/{docId} {
-      allow read: if isAdmin() || (isStudent() && resource.data.studentId == request.auth.uid);
-      allow write: if isAdmin();
-    }
-    match /competitionResults/{resultId} {
-      allow read: if isSignedIn(); // final results are shown publicly to all students
-      allow write: if isAdmin();
-    }
-
-    // ---------- Suspicious assessment events (anti-cheating) ----------
-    match /suspiciousEvents/{eventId} {
+    match /suspiciousEvents/{id} {
       allow read: if isAdmin();
-      allow write: if false; // Cloud Functions (Admin SDK) only, via logSuspiciousEvent
+      allow create: if isStudent() && request.resource.data.studentId == request.auth.uid;
     }
 
-    // ---------- Certificates (never editable by students) ----------
-    // Public read is intentional: /certificate/{certId} must be verifiable by anyone
-    // with the link, without logging in. Only put non-sensitive fields on this doc
-    // (name, course, completion date, cert ID, status) — never email/phone/regNumber.
     match /certificates/{certId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // ---------- Competitions ----------
-    // (full rule set — including competitionParticipants — defined above, near labs)
-
-    // ---------- Audit logs ----------
-    match /auditLogs/{logId} {
+    match /auditLogs/{id} {
       allow read: if isAdmin();
-      allow write: if false; // Cloud Functions (Admin SDK) only — never client-writable
+      allow create: if isSignedIn();
+      allow update, delete: if false;
     }
   }
 }
