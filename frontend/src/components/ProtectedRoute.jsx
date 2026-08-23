@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from "react-router-dom";
-import { useAuth } from "../context/AuthContext.jsx";
+import { useAuth, homeForRole } from "../context/AuthContext.jsx";
 
 export function ProtectedRoute({ children, requireRole }) {
   const { user, role, profile, loading } = useAuth();
@@ -15,9 +15,12 @@ export function ProtectedRoute({ children, requireRole }) {
   if (!user) return <Navigate to="/login" replace />;
 
   const allowedRoles = Array.isArray(requireRole) ? requireRole : [requireRole];
-  if (requireRole && !allowedRoles.includes(role)) return <Navigate to="/" replace />;
+  if (requireRole && !allowedRoles.includes(role)) {
+    // Role isiyolingana — mpeleke kwenye ukurasa wake sahihi (siyo "/" kila wakati,
+    // hilo ndilo lililokuwa linamfanya Admin apate mzunguko usio na mwisho).
+    return <Navigate to={homeForRole(role)} replace />;
+  }
 
-  // Mwanafunzi mwenye password ya muda lazima aibadilishe kwanza
   if (role === "student" && profile?.mustChangePassword && location.pathname !== "/change-password") {
     return <Navigate to="/change-password" replace />;
   }
