@@ -62,10 +62,6 @@ export default function Login() {
         </form>
 
         <p className="text-center text-sm text-ivory-muted mt-4">
-          Bado hujawezesha akaunti yako?{" "}
-          <Link to="/activate" className="text-teal hover:underline">
-            Anzisha hapa
-          </Link>
         </p>
       </div>
     </div>
