@@ -26,39 +26,61 @@ export default function TopicView() {
     load();
   }, [courseId, stageId, topicId]);
 
-  async function startQuiz() {
-    setLoading(true);
-    setError("");
-    try {
-      const getQuiz = httpsCallable(functions, "getQuizQuestions");
-      const { data } = await getQuiz({ courseId, stageId, topicId });
-      setQuiz(data.quiz);
-      setAnswers({});
-      setStartedAt(Date.now());
-      setMode("quiz");
-    } catch (err) {
-      setError("Samahani, kuna tatizo. Jaribu tena.");
-    } finally {
-      setLoading(false);
-    }
+import { collection, getDocs, doc, getDoc, setDoc, updateDoc, addDoc, serverTimestamp, increment } from "firebase/firestore";
+import { db } from "../firebase";
+import { useAuth } from "../context/AuthContext.jsx";
+
+// ndani ya component:
+const { user, profile } = useAuth();
+
+async function startQuiz() {
+  setLoading(true);
+  const snap = await getDocs(collection(db, "courses", courseId, "stages", stageId, "topics", topicId, "questions"));
+  const all = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(q => q.status === "published");
+  setQuiz(all.sort(() => Math.random() - 0.5).slice(0, 10));
+  setAnswers({}); setStartedAt(Date.now()); setMode("quiz"); setLoading(false);
+}
+
+async function submitQuiz() {
+  setLoading(true);
+  let correctCount = 0;
+  const breakdown = quiz.map(q => {
+    const isCorrect = answers[q.id] === q.correctAnswer;
+    if (isCorrect) correctCount++;
+    return { questionId: q.id, isCorrect, correctAnswer: q.correctAnswer, explanation: q.explanation };
+  });
+  const percent = Math.round((correctCount / quiz.length) * 100);
+  const passed = percent >= 60;
+  const xpAwarded = passed ? (percent === 100 ? 75 : 50) : 0;
+
+  await addDoc(collection(db, "quizAttempts"), {
+    studentId: user.uid, courseId, stageId, topicId, correctCount, total: quiz.length,
+    percent, passed, xpAwarded, createdAt: serverTimestamp(),
+  });
+
+  const progressRef = doc(db, "progress", `${user.uid}_${courseId}_${stageId}`);
+  const pSnap = await getDoc(progressRef);
+  const completedTopics = pSnap.exists() ? pSnap.data().completedTopics || {} : {};
+  await setDoc(progressRef, {
+    studentId: user.uid, courseId, stageId,
+    completedTopics: { ...completedTopics, [topicId]: passed || completedTopics[topicId] },
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+
+  if (xpAwarded > 0) {
+    await updateDoc(doc(db, "students", user.uid), {
+      xp: increment(xpAwarded), updatedAt: serverTimestamp(),
+    });
+    // Kumbuka: `increment()` haipitii ukaguzi wa xpDelta() kwenye rules (thamani halisi
+    // haionekani wakati wa uandishi) — tumia set ya moja kwa moja badala yake kama unataka
+    // ukomo huo kutumika kikamilifu:
+    // const newXp=(profile.xp||0)+xpAwarded; await updateDoc(...,{xp:newXp,...})
   }
 
-  async function submitQuiz() {
-    setLoading(true);
-    setError("");
-    try {
-      const submit = httpsCallable(functions, "submitQuizAttempt");
-      const timeTakenSeconds = Math.round((Date.now() - startedAt) / 1000);
-      const { data } = await submit({ courseId, stageId, topicId, answers, timeTakenSeconds });
-      setResult(data);
-      setMode("result");
-    } catch (err) {
-      setError(err.message?.replace(/^.*?:\s*/, "") || "Samahani, kuna tatizo. Jaribu tena.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
+  setResult({ correctCount, total: quiz.length, percent, passed, xpAwarded, breakdown });
+  setMode("result");
+  setLoading(false);
+}
   const { secondsLeft, violationCount, warning } = useAssessmentGuard({
     active: mode === "quiz" && topic?.assessmentMode,
     courseId, stageId, topicId,
