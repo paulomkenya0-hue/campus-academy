@@ -31,19 +31,15 @@ export default function Profile() {
   }, [profile]);
 
   async function handlePhotoChange(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setError("");
-
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      setError("Aina ya faili haikubaliki. Tumia JPEG, PNG, au WebP.");
-      return;
-    }
-    if (file.size > MAX_SIZE) {
-      setError("Picha ni kubwa sana. Kiwango cha juu ni MB 3.");
-      return;
-    }
-
+  const file = e.target.files?.[0];
+  if (!file || file.size > 500 * 1024) return setError("Picha isizidi 500KB.");
+  const img = await createImageBitmap(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = 128; canvas.height = 128;
+  canvas.getContext("2d").drawImage(img, 0, 0, 128, 128);
+  const base64 = canvas.toDataURL("image/jpeg", 0.7);
+  await updateDoc(doc(db, "students", user.uid), { photoBase64: base64, updatedAt: serverTimestamp() });
+  }
     setUploading(true);
     try {
       const safeName = `avatar.${file.type.split("/")[1]}`;
