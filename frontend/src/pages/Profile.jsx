@@ -46,7 +46,7 @@ export default function Profile() {
       const storageRef = ref(storage, `profilePictures/${user.uid}/${safeName}`);
       await uploadBytes(storageRef, file);
       const url = await getDownloadURL(storageRef);
-      await updateDoc(doc(db, "students", user.uid), { photoURL: url, updatedAt: serverTimestamp() });
+      await updateDoc(doc(db, "students", user.uid), { photoBase64: url, updatedAt: serverTimestamp() });
       setMessage("Picha imesasishwa.");
     } catch (err) {
       setError("Samahani, kuna tatizo. Jaribu tena.");
@@ -75,8 +75,8 @@ export default function Profile() {
       <NavBar />
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div className="card flex items-center gap-5">
-          {profile.photoURL ? (
-            <img src={profile.photoURL} alt="" className="w-20 h-20 rounded-full object-cover" />
+          {profile.photoBase64 ? (
+            <img src={profile.photoBase64} alt="" className="w-20 h-20 rounded-full object-cover" />
           ) : (
             <div className="w-20 h-20 rounded-full bg-night-raised flex items-center justify-center text-2xl">
               {profile.displayName?.[0]}
