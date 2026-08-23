@@ -52,3 +52,7 @@ export function AuthProvider({ children }) {
 export function useAuth() {
   return useContext(AuthContext);
 }
+export function homeForRole(role) {
+  if (role === "super_admin" || role === "developer") return "/admin";
+  return "/";
+}
