@@ -57,10 +57,11 @@ service cloud.firestore {
     }
 
     match /progress/{progressId} {
-      allow read: if isAdmin() || (isStudent() && resource.data.studentId == request.auth.uid);
-      allow write: if isAdmin() || (isStudent() &&
-        request.resource.data.studentId == request.auth.uid);
-    }
+  allow read: if isAdmin() || (isStudent() &&
+    (resource == null || resource.data.studentId == request.auth.uid));
+  allow write: if isAdmin() || (isStudent() &&
+    request.resource.data.studentId == request.auth.uid);
+}
 
     match /quizAttempts/{id} {
       allow read: if isAdmin() || (isStudent() && resource.data.studentId == request.auth.uid);
