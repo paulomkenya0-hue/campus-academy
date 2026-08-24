@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { collection, getDocs } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
-import { db, functions } from "../../firebase";
+import { collection, doc, setDoc, getDocs, serverTimestamp } from "firebase/firestore";
+import { db } from "../../firebase";
 
 const DEFAULT_BADGES = [
   { key: "streak-7", name: "7 Day Warrior", icon: "🔥", description: "Fikia mfululizo wa siku 7", criteria: { type: "streak_days", days: 7 } },
@@ -23,20 +22,20 @@ export default function BadgeManager() {
   }
   useEffect(() => { load(); }, []);
 
+  async function saveBadge(b) {
+    await setDoc(doc(db, "badges", b.key), {
+      ...b, published: true, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    });
+  }
+
   async function createDefaults() {
-    setSaving(true);
-    setError("");
+    setSaving(true); setError("");
     try {
-      const fn = httpsCallable(functions, "createBadge");
-      for (const b of DEFAULT_BADGES) {
-        await fn(b);
-      }
+      for (const b of DEFAULT_BADGES) await saveBadge(b);
       await load();
     } catch (err) {
-      setError(err.message?.replace(/^.*?:\s*/, "") || "Samahani, kuna tatizo.");
-    } finally {
-      setSaving(false);
-    }
+      setError(err.message || "Samahani, kuna tatizo.");
+    } finally { setSaving(false); }
   }
 
   function criteriaFromForm() {
@@ -48,18 +47,14 @@ export default function BadgeManager() {
 
   async function handleCreate() {
     if (!form.key || !form.name) return;
-    setSaving(true);
-    setError("");
+    setSaving(true); setError("");
     try {
-      const fn = httpsCallable(functions, "createBadge");
-      await fn({ key: form.key, name: form.name, icon: form.icon, description: form.description, criteria: criteriaFromForm() });
+      await saveBadge({ key: form.key, name: form.name, icon: form.icon, description: form.description, criteria: criteriaFromForm() });
       setForm({ ...form, key: "", name: "", description: "" });
       await load();
     } catch (err) {
-      setError(err.message?.replace(/^.*?:\s*/, "") || "Samahani, kuna tatizo.");
-    } finally {
-      setSaving(false);
-    }
+      setError(err.message || "Samahani, kuna tatizo.");
+    } finally { setSaving(false); }
   }
 
   return (
@@ -70,17 +65,15 @@ export default function BadgeManager() {
           <span className="text-sm text-ivory-muted">Beji (Badges)</span>
         </div>
       </nav>
-
       <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
         {badges.length === 0 && (
           <div className="card">
-            <p className="text-sm text-ivory-muted mb-3">Hakuna beji bado. Unaweza kuanza na mfano wa msingi:</p>
+            <p className="text-sm text-ivory-muted mb-3">Hakuna beji bado. Anza na mfano wa msingi:</p>
             <button onClick={createDefaults} disabled={saving} className="btn-secondary text-sm">
               {saving ? "Inaunda..." : "Unda Beji za Mfano (4)"}
             </button>
           </div>
         )}
-
         <div className="card space-y-3">
           <h2 className="font-display font-bold">Ongeza Beji Mpya</h2>
           <div className="grid grid-cols-2 gap-2">
@@ -90,25 +83,18 @@ export default function BadgeManager() {
           <input className="input-field text-sm" placeholder="Jina la Beji" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <input className="input-field text-sm" placeholder="Maelezo" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           <select className="input-field text-sm" value={form.criteriaType} onChange={(e) => setForm({ ...form, criteriaType: e.target.value })}>
-            <option value="streak_days">Mfululizo wa siku (streak_days)</option>
-            <option value="perfect_score">Alama kamili (perfect_score)</option>
+            <option value="streak_days">Mfululizo wa siku</option>
+            <option value="perfect_score">Alama kamili</option>
             <option value="first_stage_complete">Stage ya kwanza kukamilika</option>
-            <option value="fast_quiz">Quiz ya haraka (fast_quiz)</option>
+            <option value="fast_quiz">Quiz ya haraka</option>
             <option value="course_complete">Kozi nzima kukamilika</option>
           </select>
-          {form.criteriaType === "streak_days" && (
-            <input type="number" className="input-field text-sm" placeholder="Siku ngapi" value={form.days} onChange={(e) => setForm({ ...form, days: e.target.value })} />
-          )}
-          {form.criteriaType === "fast_quiz" && (
-            <input type="number" className="input-field text-sm" placeholder="Sekunde ngapi" value={form.underSeconds} onChange={(e) => setForm({ ...form, underSeconds: e.target.value })} />
-          )}
-          {form.criteriaType === "course_complete" && (
-            <input className="input-field text-sm" placeholder="Course ID" value={form.courseId} onChange={(e) => setForm({ ...form, courseId: e.target.value })} />
-          )}
+          {form.criteriaType === "streak_days" && <input type="number" className="input-field text-sm" placeholder="Siku ngapi" value={form.days} onChange={(e) => setForm({ ...form, days: e.target.value })} />}
+          {form.criteriaType === "fast_quiz" && <input type="number" className="input-field text-sm" placeholder="Sekunde ngapi" value={form.underSeconds} onChange={(e) => setForm({ ...form, underSeconds: e.target.value })} />}
+          {form.criteriaType === "course_complete" && <input className="input-field text-sm" placeholder="Course ID" value={form.courseId} onChange={(e) => setForm({ ...form, courseId: e.target.value })} />}
           <button onClick={handleCreate} disabled={saving} className="btn-primary text-sm">Hifadhi Beji</button>
           {error && <p className="text-danger text-sm">{error}</p>}
         </div>
-
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {badges.map((b) => (
             <div key={b.id} className="card text-center">
