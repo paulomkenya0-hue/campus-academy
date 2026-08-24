@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
-import { db, functions } from "../../firebase";
+import { collection, addDoc, getDocs, orderBy, query, serverTimestamp } from "firebase/firestore";
+import { db } from "../../firebase";
 
 export default function Announcements() {
   const [title, setTitle] = useState("");
@@ -22,12 +21,11 @@ export default function Announcements() {
     setSending(true);
     setError("");
     try {
-      const fn = httpsCallable(functions, "createAnnouncement");
-      await fn({ title, body });
+      await addDoc(collection(db, "announcements"), { title, body, createdAt: serverTimestamp() });
       setTitle(""); setBody("");
       await load();
     } catch (err) {
-      setError(err.message?.replace(/^.*?:\s*/, "") || "Samahani, kuna tatizo.");
+      setError(err.message || "Samahani, kuna tatizo.");
     } finally {
       setSending(false);
     }
@@ -41,7 +39,6 @@ export default function Announcements() {
           <span className="text-sm text-ivory-muted">Matangazo</span>
         </div>
       </nav>
-
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div className="card space-y-3">
           <h2 className="font-display font-bold">Tuma Tangazo Jipya</h2>
@@ -52,7 +49,6 @@ export default function Announcements() {
           </button>
           {error && <p className="text-danger text-sm">{error}</p>}
         </div>
-
         <div className="space-y-2">
           <h2 className="font-display font-bold">Matangazo Yaliyopita</h2>
           {past.map((a) => (
