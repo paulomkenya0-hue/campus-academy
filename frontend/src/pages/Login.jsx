@@ -12,32 +12,35 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  
+async function handleSubmit(e) {
+  e.preventDefault();
+  setError("");
+  setLoading(true);
+  try {
+    const loginEmail = mode === "student" ? emailForRegNumber(regNumber) : email.trim();
+    const cred = await signInWithEmailAndPassword(auth, loginEmail, password);
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      // Hatua muhimu: barua pepe ya Admin HAIPITII emailForRegNumber() kamwe —
-      // inatumwa moja kwa moja kwa Firebase Auth.
-      const loginEmail = mode === "student" ? emailForRegNumber(regNumber) : email.trim();
+    // Force refresh ili tuhakikishe tunapata custom claim mpya kabisa, si token ya zamani.
+    const tokenResult = await cred.user.getIdTokenResult(true);
+    const role = tokenResult.claims.role || null;
 
-      const cred = await signInWithEmailAndPassword(auth, loginEmail, password);
-      const tokenResult = await cred.user.getIdTokenResult();
-      const role = tokenResult.claims.role || null;
+    console.log("LOGIN DEBUG — email:", loginEmail, "role:", role, "claims:", tokenResult.claims);
 
-      navigate(homeForRole(role));
-    } catch (err) {
-      setError(
-        mode === "student"
-          ? "Samahani, namba ya usajili au password si sahihi."
-          : "Samahani, email au password si sahihi."
-      );
-    } finally {
+    if (!role) {
+      setError("Umeingia, lakini akaunti hii haina role (claim). Tazama console kwa maelezo.");
       setLoading(false);
+      return;
     }
-  }
 
+    navigate(role === "super_admin" || role === "developer" ? "/admin" : "/");
+  } catch (err) {
+    console.error("LOGIN ERROR:", err.code, err.message);
+    setError(`${err.code || "Hitilafu"}: ${err.message}`);
+  } finally {
+    setLoading(false);
+  }
+}
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
