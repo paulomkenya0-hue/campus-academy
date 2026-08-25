@@ -3,31 +3,29 @@
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply bg-night text-ivory;
-  }
-  h1, h2, h3 {
-    @apply font-display;
-  }
+  body { @apply bg-canvas text-ink; }
+  h1, h2, h3 { @apply font-display; }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-amber text-night font-display font-bold px-5 py-2.5 rounded-lg
-           hover:bg-amber-soft transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-ink text-white font-semibold px-5 py-2.5 rounded-xl
+           hover:bg-ink-soft transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-accent {
+    @apply bg-amber-soft text-amber font-semibold px-5 py-2.5 rounded-xl
+           hover:bg-amber hover:text-white transition-colors disabled:opacity-50;
   }
   .btn-secondary {
-    @apply bg-night-raised border border-night-border text-ivory font-display font-bold px-5 py-2.5 rounded-lg
-           hover:border-teal transition-colors disabled:opacity-50;
+    @apply bg-surface border border-border text-ink font-semibold px-5 py-2.5 rounded-xl
+           hover:border-ink transition-colors disabled:opacity-50;
   }
   .card {
-    @apply bg-night-surface border border-night-border rounded-xl p-5;
+    @apply bg-surface border border-border rounded-2xl p-5 shadow-card;
   }
   .input-field {
-    @apply w-full bg-night-raised border border-night-border rounded-lg px-4 py-2.5
-           text-ivory placeholder-ivory-muted focus:outline-none focus:border-teal transition-colors;
+    @apply w-full bg-surface border border-border rounded-xl px-4 py-2.5
+           text-ink placeholder-muted focus:outline-none focus:ring-2 focus:ring-teal focus:border-teal transition-colors;
   }
-  .label {
-    @apply text-sm text-ivory-muted mb-1 block;
-  }
+  .label { @apply text-sm text-muted mb-1 block font-medium; }
 }
